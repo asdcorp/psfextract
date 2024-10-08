@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Microsoft PSTREAM File Extractor
-# Copyright (C) 2023 asdcorp
+# Copyright (C) 2024 asdcorp
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,21 +23,46 @@ import sys
 import logging
 import xml.etree.ElementTree as ET
 
+class DELTA_INPUT(ctypes.Structure):
+    _fields_ = [
+        ("lpStart", ctypes.c_void_p),
+        ("uSize", ctypes.c_size_t),
+        ("Editable", ctypes.c_bool),
+    ]
+
+class DELTA_OUTPUT(ctypes.Structure):
+    _fields_ = [
+        ("lpStart", ctypes.c_void_p),
+        ("uSize", ctypes.c_size_t),
+    ]
+
 def unpack(file):
     logging.debug(f'Unpacking {file}')
 
-    result = ctypes.windll.msdelta.ApplyDeltaW(
+    with open(file, "rb") as f:
+        content = f.read()
+
+    patch = DELTA_INPUT(ctypes.cast(content, ctypes.c_void_p), len(content), True)
+    output = DELTA_OUTPUT()
+
+    ApplyDeltaB = ctypes.windll.LoadLibrary("./UpdateCompression.dll").ApplyDeltaB
+    ApplyDeltaB.restype = ctypes.c_bool
+
+    result = ApplyDeltaB(
         ctypes.c_longlong(0),
-        None,
-        ctypes.c_wchar_p(file),
-        ctypes.c_wchar_p(file)
+        ctypes.byref(DELTA_INPUT(0, 0, False)),
+        ctypes.byref(patch),
+        ctypes.byref(output),
     )
 
-    if result:
-        return True
+    if not result:
+        logging.error(f'Failed to unpack {file}')
+        return False
 
-    logging.error(f'Failed to unpack {file}')
-    return False
+    with open(file, "wb") as f:
+        f.write(ctypes.string_at(output.lpStart, output.uSize))
+
+    return True
 
 def extract(f, off, leng, dest):
     logging.debug(f'Extracting data from PSTREAM to {dest}')

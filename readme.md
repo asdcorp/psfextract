@@ -17,7 +17,8 @@ The destination directory should not exist or be empty.
 Requirements
 ------------
 This script requires at least Python 3 and works only on Windows because of
-the *msdelta.dll* library dependency.
+the *UpdateCompression.dll* library dependency. The library has to be placed
+in the working directory for the script to work.
 
 License
 -------
